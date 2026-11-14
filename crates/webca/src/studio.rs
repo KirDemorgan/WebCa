@@ -16,11 +16,11 @@ use gpui_kit::{
 use webca_core::{
     AgentSettings, CameraProfiles, ControlGroup, ControlId, ControlState, Editor, LiveWrite, ProfileBook,
     ProfileStore,
+    i18n::{self, Locale, Text},
 };
 
 use crate::{
     agent::{Agent, AgentCommand},
-    labels,
     shell::{Shell, ShellEvent},
     worker::{CameraWorker, Command, Event, FrameSlot},
 };
@@ -39,6 +39,7 @@ pub struct Studio {
     worker: CameraWorker,
     store: ProfileStore,
     agent: Agent,
+    locale: Locale,
     book: ProfileBook,
     sliders: BTreeMap<ControlId, Entity<SliderState>>,
     status: Option<SharedString>,
@@ -68,6 +69,7 @@ impl Studio {
             worker,
             store,
             agent,
+            locale: Locale::from_tag(&webca_windows::user_locale()),
             book,
             sliders: BTreeMap::new(),
             status,
@@ -98,19 +100,20 @@ impl Studio {
     fn handle(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
         match event {
             Event::Opened { info, controls } => self.open(info, controls, window, cx),
-            Event::NoCamera => self.screen = Screen::Message("No camera is connected.".into()),
+            Event::NoCamera => self.screen = Screen::Message(self.tr(Text::NoCamera).into()),
             Event::Failed(message) => {
-                self.screen = Screen::Message(format!("Cannot open the camera: {message}").into());
+                self.screen =
+                    Screen::Message(format!("{} {message}", self.tr(Text::CannotOpenCamera)).into());
             }
             Event::DefaultsSaved => self.finish_save(true, cx),
             Event::DefaultsUnavailable => self.finish_save(false, cx),
             Event::DefaultsFailed(message) => {
-                self.status = Some(format!("Saved, but Windows refused: {message}").into());
+                self.status = Some(format!("{} {message}", self.tr(Text::SavedButRefused)).into());
             }
             Event::WriteFailed(message) => self.status = Some(message.into()),
             Event::FrameReady => self.show_latest_frame(window),
             Event::PreviewUnavailable(message) => {
-                self.preview_note = Some(format!("Preview is unavailable: {message}").into());
+                self.preview_note = Some(format!("{} {message}", self.tr(Text::PreviewUnavailable)).into());
             }
         }
         cx.notify();
@@ -203,7 +206,7 @@ impl Studio {
         self.book.set_camera(&editor.camera().key, editor.profiles().clone());
         match self.store.save(&self.book) {
             Ok(()) => {
-                self.status = Some("Saving…".into());
+                self.status = Some(self.tr(Text::Saving).into());
                 self.worker.send(Command::SaveDefaults(settings));
             }
             Err(error) => self.status = Some(error.to_string().into()),
@@ -221,22 +224,23 @@ impl Studio {
             let _ = webca_windows::enable_autostart(&executable);
         }
         Shell::notify(cx, ShellEvent::ProfilesChanged);
-        self.status = Some(if native {
-            "Saved. Windows applies it in every app.".into()
-        } else {
-            "Saved. WebCa keeps it applied from the tray.".into()
-        });
+        self.status =
+            Some(if native { self.tr(Text::SavedNative).into() } else { self.tr(Text::SavedAgent).into() });
+    }
+
+    const fn tr(&self, text: Text) -> &'static str {
+        i18n::text(self.locale, text)
     }
 
     fn enable_native_mode(&mut self, cx: &mut Context<Self>) {
         let Screen::Ready(editor) = &self.screen else { return };
         let Some(family) = webca_windows::current_package_family() else {
-            self.status = Some("System-wide mode is available in the installed version of WebCa.".into());
+            self.status = Some(self.tr(Text::NativeNeedsInstall).into());
             return cx.notify();
         };
         let Ok(executable) = std::env::current_exe() else { return };
         let arguments = format!("{} \"{}\" {family}", crate::ASSOCIATE_FLAG, editor.camera().key);
-        self.status = Some("Waiting for permission…".into());
+        self.status = Some(self.tr(Text::WaitingForPermission).into());
         cx.notify();
         let request =
             cx.background_spawn(async move { webca_windows::run_elevated(&executable, &arguments) });
@@ -245,7 +249,7 @@ impl Studio {
             let _ = this.update(cx, |studio, cx| match result {
                 Ok(0) => studio.save(cx),
                 Ok(_) => {
-                    studio.status = Some("Windows did not accept WebCa as the camera companion.".into());
+                    studio.status = Some(studio.tr(Text::CompanionRejected).into());
                     cx.notify();
                 }
                 Err(error) => {
@@ -259,7 +263,7 @@ impl Studio {
 
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
         match &self.screen {
-            Screen::Connecting => centered("Looking for your camera…", cx),
+            Screen::Connecting => centered(self.tr(Text::LookingForCamera), cx),
             Screen::Message(message) => centered(message.clone(), cx),
             Screen::Ready(editor) => h_flex()
                 .size_full()
@@ -337,11 +341,13 @@ impl Studio {
                                 .size_full()
                                 .object_fit(ObjectFit::Cover),
                         ),
-                        None => {
-                            stage.child(div().text_sm().text_color(theme.muted_foreground).child(
-                                self.preview_note.clone().unwrap_or_else(|| "Starting preview…".into()),
-                            ))
-                        }
+                        None => stage.child(
+                            div().text_sm().text_color(theme.muted_foreground).child(
+                                self.preview_note
+                                    .clone()
+                                    .unwrap_or_else(|| self.tr(Text::PreviewStarting).into()),
+                            ),
+                        ),
                     }),
             )
             .child(self.render_status(editor, cx))
@@ -356,14 +362,14 @@ impl Studio {
             .text_color(theme.muted_foreground)
             .child(div().size_2().rounded_full().bg(if dirty { theme.warning } else { theme.success }))
             .child(self.status.clone().unwrap_or_else(|| {
-                if dirty { "Unsaved changes".into() } else { "Everything is saved".into() }
+                self.tr(if dirty { Text::UnsavedChanges } else { Text::EverythingSaved }).into()
             }))
             .child(div().flex_1())
             .child(if self.book.agent().native {
-                div().child("System-wide mode is on").into_any_element()
+                div().child(self.tr(Text::NativeOn)).into_any_element()
             } else {
                 Button::new("native")
-                    .label("Turn on system-wide mode")
+                    .label(self.tr(Text::TurnOnNative))
                     .ghost()
                     .xsmall()
                     .on_click(cx.listener(|this, _, _, cx| this.enable_native_mode(cx)))
@@ -395,22 +401,26 @@ impl Studio {
                     .justify_between()
                     .border_t_1()
                     .border_color(theme.border)
-                    .child(Button::new("reset").label("Reset").ghost().small().on_click(cx.listener(
-                        |this, _, window, cx| {
+                    .child(Button::new("reset").label(self.tr(Text::Reset)).ghost().small().on_click(
+                        cx.listener(|this, _, window, cx| {
                             this.edit_and_sync(window, cx, Editor::reset_to_factory);
-                        },
-                    )))
+                        }),
+                    ))
                     .child(
                         h_flex()
                             .gap_2()
-                            .child(Button::new("revert").label("Revert").small().disabled(!dirty).on_click(
-                                cx.listener(|this, _, window, cx| {
-                                    this.edit_and_sync(window, cx, Editor::revert);
-                                }),
-                            ))
+                            .child(
+                                Button::new("revert")
+                                    .label(self.tr(Text::Revert))
+                                    .small()
+                                    .disabled(!dirty)
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.edit_and_sync(window, cx, Editor::revert);
+                                    })),
+                            )
                             .child(
                                 Button::new("save")
-                                    .label("Save")
+                                    .label(self.tr(Text::Save))
                                     .primary()
                                     .small()
                                     .disabled(!dirty)
@@ -431,7 +441,7 @@ impl Studio {
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(theme.muted_foreground)
-                    .child(labels::group(group)),
+                    .child(i18n::group_label(self.locale, group)),
             )
             .children(rows)
             .into_any_element()
@@ -441,13 +451,13 @@ impl Studio {
         let theme = cx.theme();
         let id = state.capability.id;
         let setting = editor.setting(id).unwrap_or(state.current);
-        let header = h_flex().justify_between().text_sm().child(labels::control(id)).child(
+        let header = h_flex().justify_between().text_sm().child(i18n::control_label(self.locale, id)).child(
             h_flex()
                 .gap_2()
                 .when(state.capability.supports_auto && state.capability.supports_manual, |row| {
                     row.child(
                         Switch::new(("auto", id as usize))
-                            .label("Auto")
+                            .label(self.tr(Text::Auto))
                             .small()
                             .checked(setting.is_auto())
                             .on_click(cx.listener(move |this, checked: &bool, _, cx| {
@@ -458,7 +468,7 @@ impl Studio {
                 })
                 .when(!id.is_choice(), |row| {
                     row.child(
-                        div().text_color(theme.muted_foreground).child(labels::value(id, setting.value)),
+                        div().text_color(theme.muted_foreground).child(i18n::value_label(id, setting.value)),
                     )
                 }),
         );
@@ -467,10 +477,7 @@ impl Studio {
             h_flex()
                 .gap_1()
                 .children((range.min()..=range.max()).map(|value| {
-                    let label = usize::try_from(value)
-                        .ok()
-                        .and_then(|index| labels::POWER_LINE_CHOICES.get(index).copied())
-                        .map_or_else(|| value.to_string(), str::to_owned);
+                    let label = i18n::power_line_label(self.locale, value);
                     let button = Button::new(("choice", value.unsigned_abs() as usize)).label(label).small();
                     let button = if setting.value == value { button.primary() } else { button.ghost() };
                     button.on_click(cx.listener(move |this, _, _, cx| {

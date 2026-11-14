@@ -103,6 +103,7 @@ fn tray_state(store: &ProfileStore) -> TrayState {
             .unwrap_or_default(),
         active: camera.map(|camera| camera.active().name().to_owned()),
         lock: book.agent().lock,
+        locale: webca_core::i18n::Locale::from_tag(&webca_windows::user_locale()),
     }
 }
 

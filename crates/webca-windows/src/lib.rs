@@ -18,6 +18,8 @@ mod error;
 #[cfg(windows)]
 mod instance;
 #[cfg(windows)]
+mod locale;
+#[cfg(windows)]
 mod monitor;
 #[cfg(windows)]
 mod preview;
@@ -37,6 +39,8 @@ pub use defaults::{DefaultsError, DefaultsStore, companion_app};
 pub use frame::{PreviewFrame, VideoFormat, pack_bgra, pick_preview_format};
 #[cfg(windows)]
 pub use instance::{Instance, PrimaryInstance};
+#[cfg(windows)]
+pub use locale::user_locale;
 pub use mapping::{
     Location, RawRange, Timing, capability, device_error, device_instance_id, device_parameters_key, flags,
     identify, locate, setting, timing,

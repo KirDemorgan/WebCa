@@ -2,7 +2,6 @@
 
 mod agent;
 mod command;
-mod labels;
 mod shell;
 mod studio;
 mod theme;

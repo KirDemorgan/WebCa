@@ -8,6 +8,7 @@ mod control;
 mod device;
 mod editor;
 mod guard;
+pub mod i18n;
 pub mod mcp;
 mod profile;
 mod range;

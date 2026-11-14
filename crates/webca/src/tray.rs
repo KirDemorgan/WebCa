@@ -9,6 +9,8 @@ use tray_icon::{
     menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem},
 };
 
+use webca_core::i18n::{self, Locale, Text};
+
 use crate::shell::ShellEvent;
 
 const ICON_SIZE: u32 = 32;
@@ -20,6 +22,7 @@ pub struct TrayState {
     pub profiles: Vec<String>,
     pub active: Option<String>,
     pub lock: bool,
+    pub locale: Locale,
 }
 
 /// The notification-area icon and its menu.
@@ -75,11 +78,11 @@ impl Tray {
         if !state.profiles.is_empty() {
             let _ = menu.append(&PredefinedMenuItem::separator());
         }
-        let lock = CheckMenuItem::new("Lock values", true, state.lock, None);
+        let lock = CheckMenuItem::new(i18n::text(state.locale, Text::LockValues), true, state.lock, None);
         actions.insert(lock.id().clone(), ShellEvent::ToggleLock);
-        let open = MenuItem::new("Open WebCa", true, None);
+        let open = MenuItem::new(i18n::text(state.locale, Text::OpenWebCa), true, None);
         actions.insert(open.id().clone(), ShellEvent::Open);
-        let quit = MenuItem::new("Quit", true, None);
+        let quit = MenuItem::new(i18n::text(state.locale, Text::Quit), true, None);
         actions.insert(quit.id().clone(), ShellEvent::Quit);
         let _ = menu.append_items(&[&lock, &PredefinedMenuItem::separator(), &open, &quit]);
         if let Ok(mut current) = self.actions.lock() {

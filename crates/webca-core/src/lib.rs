@@ -14,6 +14,7 @@ mod profile;
 mod range;
 mod setting;
 mod store;
+pub mod update;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

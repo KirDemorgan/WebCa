@@ -15,6 +15,7 @@ futures = "0.3"
 serde_json = "1"
 image = { version = "0.25", default-features = false }
 tray-icon = "0.26"
+ureq = "3"
 
 [lints]
 workspace = true

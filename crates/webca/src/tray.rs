@@ -23,6 +23,7 @@ pub struct TrayState {
     pub active: Option<String>,
     pub lock: bool,
     pub locale: Locale,
+    pub update: Option<webca_core::update::Update>,
 }
 
 /// The notification-area icon and its menu.
@@ -77,6 +78,12 @@ impl Tray {
         }
         if !state.profiles.is_empty() {
             let _ = menu.append(&PredefinedMenuItem::separator());
+        }
+        if let Some(update) = &state.update {
+            let label = format!("{} {}", i18n::text(state.locale, Text::UpdateAvailable), update.version);
+            let item = MenuItem::new(label, true, None);
+            actions.insert(item.id().clone(), ShellEvent::OpenUrl(update.url.clone()));
+            let _ = menu.append_items(&[&item, &PredefinedMenuItem::separator()]);
         }
         let lock = CheckMenuItem::new(i18n::text(state.locale, Text::LockValues), true, state.lock, None);
         actions.insert(lock.id().clone(), ShellEvent::ToggleLock);

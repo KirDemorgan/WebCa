@@ -6,7 +6,10 @@ use gpui_kit::{
     AnyWindowHandle, App, AppContext, Bounds, Global, WindowBounds, WindowOptions, component::TitleBar, px,
     size,
 };
-use webca_core::{AgentSettings, ProfileBook, ProfileStore};
+use webca_core::{
+    AgentSettings, ProfileBook, ProfileStore,
+    update::{Update, Version, latest_release_endpoint, newer_release},
+};
 
 use crate::{
     agent::{Agent, AgentCommand},
@@ -22,6 +25,8 @@ pub enum ShellEvent {
     ToggleLock,
     SelectProfile(String),
     ProfilesChanged,
+    UpdateAvailable(Update),
+    OpenUrl(String),
 }
 
 /// Process-wide services shared by the tray and the settings window.
@@ -31,6 +36,7 @@ pub struct Shell {
     pub events: UnboundedSender<ShellEvent>,
     window: Option<AnyWindowHandle>,
     tray: Option<Tray>,
+    update: Option<Update>,
 }
 
 impl Global for Shell {}
@@ -43,8 +49,9 @@ impl Shell {
         inbox: UnboundedReceiver<ShellEvent>,
         cx: &mut App,
     ) {
-        let tray = Tray::new(events.clone(), &tray_state(&store)).ok();
-        cx.set_global(Self { store, agent, events, window: None, tray });
+        let tray = Tray::new(events.clone(), &tray_state(&store, None)).ok();
+        check_for_updates(events.clone());
+        cx.set_global(Self { store, agent, events, window: None, tray, update: None });
         cx.spawn(async move |cx| {
             let mut inbox = inbox;
             while let Some(event) = inbox.next().await {
@@ -74,6 +81,13 @@ fn handle(event: ShellEvent, cx: &mut App) {
             }
         }),
         ShellEvent::ProfilesChanged => refresh_tray(cx),
+        ShellEvent::UpdateAvailable(update) => {
+            cx.global_mut::<Shell>().update = Some(update);
+            refresh_tray(cx);
+        }
+        ShellEvent::OpenUrl(url) => {
+            let _ = std::process::Command::new("explorer.exe").arg(url).spawn();
+        }
     }
 }
 
@@ -90,11 +104,11 @@ fn edit_book(cx: &mut App, change: impl FnOnce(&mut ProfileBook)) {
 fn refresh_tray(cx: &mut App) {
     let shell = cx.global::<Shell>();
     if let Some(tray) = &shell.tray {
-        tray.update(&tray_state(&shell.store));
+        tray.update(&tray_state(&shell.store, shell.update.clone()));
     }
 }
 
-fn tray_state(store: &ProfileStore) -> TrayState {
+fn tray_state(store: &ProfileStore, update: Option<Update>) -> TrayState {
     let book = store.load().unwrap_or_else(|_| ProfileBook::new());
     let camera = book.cameras().next().map(|(_, camera)| camera);
     TrayState {
@@ -104,7 +118,28 @@ fn tray_state(store: &ProfileStore) -> TrayState {
         active: camera.map(|camera| camera.active().name().to_owned()),
         lock: book.agent().lock,
         locale: webca_core::i18n::Locale::from_tag(&webca_windows::user_locale()),
+        update,
     }
+}
+
+/// Asks GitHub for a newer release once, in the background, when a repository is configured.
+fn check_for_updates(events: UnboundedSender<ShellEvent>) {
+    let Some(endpoint) = latest_release_endpoint(env!("CARGO_PKG_REPOSITORY")) else { return };
+    let Ok(current) = env!("CARGO_PKG_VERSION").parse::<Version>() else { return };
+    std::thread::Builder::new()
+        .name("webca-update".into())
+        .spawn(move || {
+            let response = ureq::get(&endpoint)
+                .header("User-Agent", "WebCa")
+                .header("Accept", "application/vnd.github+json")
+                .call()
+                .ok()
+                .and_then(|mut response| response.body_mut().read_to_string().ok());
+            if let Some(update) = response.and_then(|body| newer_release(current, &body)) {
+                let _ = events.unbounded_send(ShellEvent::UpdateAvailable(update));
+            }
+        })
+        .expect("the update thread starts");
 }
 
 /// Brings the settings window to the front, opening it when needed.

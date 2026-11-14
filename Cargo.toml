@@ -27,6 +27,7 @@ module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 doc_markdown = "allow"
+must_use_candidate = "allow"
 
 [profile.release]
 lto = "thin"

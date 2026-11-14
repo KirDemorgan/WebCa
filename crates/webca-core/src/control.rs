@@ -99,7 +99,7 @@ impl ControlId {
 
 impl fmt::Display for ControlId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.key())
+        f.pad(self.key())
     }
 }
 
@@ -130,6 +130,7 @@ mod tests {
         for id in ControlId::ALL {
             assert_eq!(id.key().parse::<ControlId>(), Ok(id));
             assert_eq!(id.to_string(), id.key());
+            assert_eq!(format!("{id:>24}").len(), 24);
         }
     }
 

@@ -51,7 +51,7 @@ impl Studio {
         };
         Self::listen(events, window, cx);
         let appearance = cx.observe_window_appearance(window, |_, window, cx| {
-            Theme::sync_system_appearance(Some(window), cx)
+            Theme::sync_system_appearance(Some(window), cx);
         });
         Self {
             screen: Screen::Connecting,

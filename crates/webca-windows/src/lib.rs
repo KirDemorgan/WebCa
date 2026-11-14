@@ -10,6 +10,8 @@ mod defaults;
 #[cfg(windows)]
 mod error;
 #[cfg(windows)]
+mod monitor;
+#[cfg(windows)]
 mod preview;
 #[cfg(windows)]
 mod session;
@@ -23,6 +25,8 @@ pub use mapping::{
     Location, RawRange, Timing, capability, device_error, device_parameters_key, flags, identify, locate,
     setting, timing,
 };
+#[cfg(windows)]
+pub use monitor::{ActivityMonitor, ActivityReport, ControlMonitor};
 #[cfg(windows)]
 pub use preview::PreviewReader;
 #[cfg(windows)]

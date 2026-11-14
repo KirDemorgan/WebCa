@@ -21,6 +21,8 @@ use crate::{
 };
 
 const AGENT_FLAG: &str = "--agent";
+pub const ASSOCIATE_FLAG: &str = "--associate";
+const DISSOCIATE_FLAG: &str = "--dissociate";
 
 /// Holds the single-instance lock for as long as the application runs.
 struct InstanceLock(#[allow(dead_code)] Option<PrimaryInstance>);
@@ -34,8 +36,22 @@ fn profile_path() -> PathBuf {
         .join("profiles.toml")
 }
 
+/// Runs a maintenance request from an elevated copy of WebCa and returns the process exit code.
+fn run_elevated_request(arguments: &[String]) -> Option<i32> {
+    let result = match arguments {
+        [_, flag, device, family] if flag == ASSOCIATE_FLAG => webca_windows::associate(device, family),
+        [_, flag, device] if flag == DISSOCIATE_FLAG => webca_windows::dissociate(device),
+        _ => return None,
+    };
+    Some(i32::from(result.is_err()))
+}
+
 fn main() {
-    let start_hidden = std::env::args().any(|argument| argument == AGENT_FLAG);
+    let arguments: Vec<String> = std::env::args().collect();
+    if let Some(code) = run_elevated_request(&arguments) {
+        std::process::exit(code);
+    }
+    let start_hidden = arguments.iter().any(|argument| argument == AGENT_FLAG);
     let instance = match Instance::acquire() {
         Ok(Instance::Secondary) => return,
         Ok(Instance::Primary(primary)) => Some(primary),

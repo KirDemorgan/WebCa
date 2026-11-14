@@ -215,7 +215,9 @@ impl Studio {
         let settings = self.book.agent();
         self.book.set_agent(AgentSettings { native, ..settings });
         let _ = self.store.save(&self.book);
-        if let Ok(executable) = std::env::current_exe() {
+        if webca_windows::current_package_family().is_none()
+            && let Ok(executable) = std::env::current_exe()
+        {
             let _ = webca_windows::enable_autostart(&executable);
         }
         Shell::notify(cx, ShellEvent::ProfilesChanged);
@@ -224,6 +226,35 @@ impl Studio {
         } else {
             "Saved. WebCa keeps it applied from the tray.".into()
         });
+    }
+
+    fn enable_native_mode(&mut self, cx: &mut Context<Self>) {
+        let Screen::Ready(editor) = &self.screen else { return };
+        let Some(family) = webca_windows::current_package_family() else {
+            self.status = Some("System-wide mode is available in the installed version of WebCa.".into());
+            return cx.notify();
+        };
+        let Ok(executable) = std::env::current_exe() else { return };
+        let arguments = format!("{} \"{}\" {family}", crate::ASSOCIATE_FLAG, editor.camera().key);
+        self.status = Some("Waiting for permission…".into());
+        cx.notify();
+        let request =
+            cx.background_spawn(async move { webca_windows::run_elevated(&executable, &arguments) });
+        cx.spawn(async move |this, cx| {
+            let result = request.await;
+            let _ = this.update(cx, |studio, cx| match result {
+                Ok(0) => studio.save(cx),
+                Ok(_) => {
+                    studio.status = Some("Windows did not accept WebCa as the camera companion.".into());
+                    cx.notify();
+                }
+                Err(error) => {
+                    studio.status = Some(error.to_string().into());
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -313,24 +344,31 @@ impl Studio {
                         }
                     }),
             )
-            .child(
-                h_flex()
-                    .gap_2()
-                    .text_xs()
-                    .text_color(theme.muted_foreground)
-                    .child(div().size_2().rounded_full().bg(if editor.is_dirty() {
-                        theme.warning
-                    } else {
-                        theme.success
-                    }))
-                    .child(self.status.clone().unwrap_or_else(|| {
-                        if editor.is_dirty() {
-                            "Unsaved changes".into()
-                        } else {
-                            "Everything is saved".into()
-                        }
-                    })),
-            )
+            .child(self.render_status(editor, cx))
+    }
+
+    fn render_status(&self, editor: &Editor, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        let dirty = editor.is_dirty();
+        h_flex()
+            .gap_2()
+            .text_xs()
+            .text_color(theme.muted_foreground)
+            .child(div().size_2().rounded_full().bg(if dirty { theme.warning } else { theme.success }))
+            .child(self.status.clone().unwrap_or_else(|| {
+                if dirty { "Unsaved changes".into() } else { "Everything is saved".into() }
+            }))
+            .child(div().flex_1())
+            .child(if self.book.agent().native {
+                div().child("System-wide mode is on").into_any_element()
+            } else {
+                Button::new("native")
+                    .label("Turn on system-wide mode")
+                    .ghost()
+                    .xsmall()
+                    .on_click(cx.listener(|this, _, _, cx| this.enable_native_mode(cx)))
+                    .into_any_element()
+            })
     }
 
     fn render_panel(&self, editor: &Editor, cx: &mut Context<Self>) -> impl IntoElement {

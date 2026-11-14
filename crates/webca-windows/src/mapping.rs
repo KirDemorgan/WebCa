@@ -81,6 +81,17 @@ pub fn device_parameters_key(device_path: &str) -> Option<String> {
     ))
 }
 
+/// Device instance id (as shown in Device Manager) of the camera behind a device interface path.
+#[must_use]
+pub fn device_instance_id(device_path: &str) -> Option<String> {
+    let rest = device_path.strip_prefix(r"\\?\")?;
+    let interface = rest.split_once('\\').map_or(rest, |(interface, _)| interface);
+    let without_class = &interface[..interface.rfind("#{")?];
+    let parts: Vec<&str> = without_class.split('#').collect();
+    let [enumerator, hardware, instance] = parts.as_slice() else { return None };
+    Some(format!(r"{}\{}\{}", enumerator.to_uppercase(), hardware.to_uppercase(), instance.to_uppercase()))
+}
+
 /// Raw output of `GetRange` on a DirectShow control interface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RawRange {
@@ -190,6 +201,17 @@ mod tests {
         assert_eq!(device_parameters_key("usb#vid#{guid}"), None);
         assert_eq!(device_parameters_key(r"\\?\usb#vid_1d6c\global"), None);
         assert_eq!(device_parameters_key(r"\\?\usb#vid#{guid\global"), None);
+    }
+
+    #[test]
+    fn device_instance_id_matches_device_manager() {
+        let path = r"\\?\usb#vid_1d6c&pid_0103&mi_00#7&285f974e&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}\global";
+        assert_eq!(device_instance_id(path).unwrap(), r"USB\VID_1D6C&PID_0103&MI_00\7&285F974E&0&0000");
+        let no_reference = r"\\?\usb#vid_1&pid_2#5&abc#{e5323777-f976-4f5b-9b55-b94699c46e44}";
+        assert_eq!(device_instance_id(no_reference).unwrap(), r"USB\VID_1&PID_2\5&ABC");
+        assert_eq!(device_instance_id("usb#a#b#{x}"), None);
+        assert_eq!(device_instance_id(r"\\?\usb#a#b\global"), None);
+        assert_eq!(device_instance_id(r"\\?\usb#a#{x}\global"), None);
     }
 
     #[test]

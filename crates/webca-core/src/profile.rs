@@ -295,6 +295,10 @@ impl ProfileBook {
         self.cameras.entry(key.clone()).or_default()
     }
 
+    pub fn set_camera(&mut self, key: &CameraKey, profiles: CameraProfiles) {
+        self.cameras.insert(key.clone(), profiles);
+    }
+
     pub fn cameras(&self) -> impl Iterator<Item = (&CameraKey, &CameraProfiles)> {
         self.cameras.iter()
     }
@@ -419,6 +423,10 @@ mod tests {
         book.camera_mut(&key).active_mut().set(ControlId::Zoom, ControlSetting::manual(2));
         assert_eq!(book.camera(&key).unwrap().active().get(ControlId::Zoom), Some(ControlSetting::manual(2)));
         assert_eq!(book.cameras().count(), 1);
+        let mut replacement = CameraProfiles::default();
+        replacement.add("Night").unwrap();
+        book.set_camera(&key, replacement.clone());
+        assert_eq!(book.camera(&key), Some(&replacement));
     }
 
     #[test]

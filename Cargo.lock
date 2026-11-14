@@ -7068,6 +7068,7 @@ dependencies = [
 name = "webca"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "gpui-kit",
  "webca-core",
  "webca-windows",

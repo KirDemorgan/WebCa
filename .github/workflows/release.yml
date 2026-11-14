@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version tag to publish, for example v0.1.0
+        required: true
 
 permissions:
   contents: write
@@ -10,24 +15,40 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      TAG: ${{ inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
+      - name: Check that the tag matches the crate version
+        shell: pwsh
+        run: |
+          $version = (cargo metadata --format-version 1 --no-deps | ConvertFrom-Json).packages |
+            Where-Object name -eq 'webca' | Select-Object -ExpandProperty version
+          if ($env:TAG -ne "v$version") { throw "Tag $env:TAG does not match crate version v$version" }
       - name: Build MSIX package
         shell: pwsh
         run: ./scripts/package.ps1 -Mode Pack -Publisher '${{ vars.MSIX_PUBLISHER || 'CN=WebCa' }}'
       - name: Build portable archive
         shell: pwsh
         run: |
-          $version = '${{ github.ref_name }}'
-          Compress-Archive -Path target/x86_64-pc-windows-msvc/release/webca.exe, LICENSE, README.md `
-            -DestinationPath "target/package/WebCa-$version-portable-x64.zip"
+          Compress-Archive -Path target/x86_64-pc-windows-msvc/release/webca.exe, LICENSE, README.md, README.ru.md `
+            -DestinationPath "target/package/WebCa-$($env:TAG.TrimStart('v'))-portable-x64.zip"
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            **Portable** — download the `-portable-x64.zip` archive, unpack it and run `webca.exe`.
+            Settings are kept applied by the tray agent.
+
+            **MSIX** — the `.msix` package enables system-wide mode. Until the package is signed by a
+            trusted certificate, Windows installs it only with Developer Mode turned on.
           files: |
             target/package/*.msix
             target/package/*.zip

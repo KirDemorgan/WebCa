@@ -76,6 +76,10 @@ Download the latest release from the **Releases** page:
 | `WebCa-x.y.z-x64.msix` | You want system-wide mode and automatic start. Double-click to install. |
 | `WebCa-x.y.z-portable-x64.zip` | You prefer a single executable. Settings are kept by the tray agent. |
 
+Releases are currently published as pre-releases. The MSIX package is not yet signed by a trusted
+certificate, so Windows installs it only with Developer Mode turned on; the portable archive works
+everywhere.
+
 Requirements: Windows 11 (x64) and a UVC webcam. Windows 10 is not supported yet — see
 [docs/windows-10-gaps.md](docs/windows-10-gaps.md).
 

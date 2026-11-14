@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use futures::{StreamExt, channel::mpsc::UnboundedReceiver};
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Sizable, TitleBar,
+    ActiveTheme, Disableable, Sizable, Theme, TitleBar,
     button::{Button, ButtonVariants},
     h_flex,
     slider::{Slider, SliderEvent, SliderState},
@@ -39,6 +39,7 @@ pub struct Studio {
     sliders: BTreeMap<ControlId, Entity<SliderState>>,
     status: Option<SharedString>,
     slider_subscriptions: Vec<Subscription>,
+    _appearance: Subscription,
 }
 
 impl Studio {
@@ -49,6 +50,9 @@ impl Studio {
             Err(error) => (ProfileBook::new(), Some(error.to_string().into())),
         };
         Self::listen(events, window, cx);
+        let appearance = cx.observe_window_appearance(window, |_, window, cx| {
+            Theme::sync_system_appearance(Some(window), cx)
+        });
         Self {
             screen: Screen::Connecting,
             worker,
@@ -57,6 +61,7 @@ impl Studio {
             sliders: BTreeMap::new(),
             status,
             slider_subscriptions: Vec::new(),
+            _appearance: appearance,
         }
     }
 

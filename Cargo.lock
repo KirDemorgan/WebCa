@@ -7070,6 +7070,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "gpui-kit",
+ "serde_json",
  "webca-core",
  "webca-windows",
 ]

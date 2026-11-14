@@ -12,6 +12,7 @@ webca-core.workspace = true
 webca-windows.workspace = true
 gpui-kit = "=0.9.1"
 futures = "0.3"
+serde_json = "1"
 
 [lints]
 workspace = true

@@ -2,15 +2,12 @@
 
 mod labels;
 mod studio;
+mod theme;
 mod worker;
 
 use std::path::PathBuf;
 
-use gpui_kit::{
-    AppContext, Bounds, WindowBounds, WindowOptions,
-    component::{Theme, TitleBar},
-    px, size,
-};
+use gpui_kit::{AppContext, Bounds, WindowBounds, WindowOptions, component::TitleBar, px, size};
 use webca_core::ProfileStore;
 
 use crate::studio::Studio;
@@ -25,7 +22,7 @@ fn profile_path() -> PathBuf {
 fn main() {
     gpui_kit::application().with_assets(gpui_kit::assets::Assets).run(|cx| {
         gpui_kit::init(cx);
-        Theme::sync_system_appearance(None, cx);
+        theme::install(cx);
         let bounds = Bounds::centered(None, size(px(1040.), px(660.)), cx);
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),

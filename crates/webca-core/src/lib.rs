@@ -5,6 +5,7 @@
 mod apply;
 mod control;
 mod device;
+mod editor;
 mod profile;
 mod range;
 mod setting;
@@ -16,6 +17,7 @@ pub mod testing;
 pub use apply::{ApplyPlan, ApplyReport, ControlState, SkipReason, apply, capture, snapshot};
 pub use control::{ControlGroup, ControlId, UnknownControl};
 pub use device::{CameraDevice, CameraInfo, ControlCapability, DeviceError};
+pub use editor::{Editor, LiveWrite};
 pub use profile::{CameraKey, CameraProfiles, Profile, ProfileBook, ProfileError};
 pub use range::{ControlRange, RangeError};
 pub use setting::{ControlMode, ControlSetting};

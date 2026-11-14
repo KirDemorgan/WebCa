@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use futures::{StreamExt, channel::mpsc::UnboundedReceiver};
 use gpui_kit::component::{
@@ -10,8 +10,8 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    AnyElement, App, AppContext, Context, Entity, FontWeight, IntoElement, ParentElement, Render,
-    SharedString, Styled, Subscription, Window, div, prelude::*, px,
+    AnyElement, App, AppContext, Context, Entity, FontWeight, IntoElement, ObjectFit, ParentElement, Render,
+    RenderImage, SharedString, Styled, StyledImage, Subscription, Window, div, img, prelude::*, px,
 };
 use webca_core::{
     CameraProfiles, ControlGroup, ControlId, ControlState, Editor, LiveWrite, ProfileBook, ProfileStore,
@@ -19,7 +19,7 @@ use webca_core::{
 
 use crate::{
     labels,
-    worker::{CameraWorker, Command, Event},
+    worker::{CameraWorker, Command, Event, FrameSlot},
 };
 
 const SIDE_PANEL_WIDTH: f32 = 360.;
@@ -38,13 +38,16 @@ pub struct Studio {
     book: ProfileBook,
     sliders: BTreeMap<ControlId, Entity<SliderState>>,
     status: Option<SharedString>,
+    frames: FrameSlot,
+    preview: Option<Arc<RenderImage>>,
+    preview_note: Option<SharedString>,
     slider_subscriptions: Vec<Subscription>,
     _appearance: Subscription,
 }
 
 impl Studio {
     pub fn new(store: ProfileStore, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let (worker, events) = CameraWorker::spawn();
+        let (worker, events, frames) = CameraWorker::spawn();
         let (book, status) = match store.load() {
             Ok(book) => (book, None),
             Err(error) => (ProfileBook::new(), Some(error.to_string().into())),
@@ -60,6 +63,9 @@ impl Studio {
             book,
             sliders: BTreeMap::new(),
             status,
+            frames,
+            preview: None,
+            preview_note: None,
             slider_subscriptions: Vec::new(),
             _appearance: appearance,
         }
@@ -95,6 +101,10 @@ impl Studio {
                 self.status = Some(format!("Saved, but Windows refused: {message}").into());
             }
             Event::WriteFailed(message) => self.status = Some(message.into()),
+            Event::FrameReady => self.show_latest_frame(window),
+            Event::PreviewUnavailable(message) => {
+                self.preview_note = Some(format!("Preview is unavailable: {message}").into());
+            }
         }
         cx.notify();
     }
@@ -139,6 +149,15 @@ impl Studio {
         }
         self.screen = Screen::Ready(Box::new(editor));
         self.status = None;
+    }
+
+    fn show_latest_frame(&mut self, window: &mut Window) {
+        let Some(frame) = self.frames.lock().ok().and_then(|mut latest| latest.take()) else { return };
+        let Some(buffer) = image::RgbaImage::from_raw(frame.width, frame.height, frame.bgra) else { return };
+        let next = Arc::new(RenderImage::new([image::Frame::new(buffer)]));
+        if let Some(previous) = self.preview.replace(next) {
+            let _ = window.drop_image(previous);
+        }
     }
 
     fn edit(&mut self, cx: &mut Context<Self>, change: impl FnOnce(&mut Editor) -> Vec<LiveWrite>) {
@@ -205,6 +224,7 @@ impl Studio {
         let active = editor.active_profile().to_owned();
         v_flex()
             .flex_1()
+            .min_w_0()
             .h_full()
             .gap_4()
             .px_6()
@@ -252,7 +272,24 @@ impl Studio {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child(div().text_sm().text_color(theme.muted_foreground).child("Live preview")),
+                    .relative()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .map(|stage| match &self.preview {
+                        Some(frame) => stage.child(
+                            img(frame.clone())
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .size_full()
+                                .object_fit(ObjectFit::Cover),
+                        ),
+                        None => {
+                            stage.child(div().text_sm().text_color(theme.muted_foreground).child(
+                                self.preview_note.clone().unwrap_or_else(|| "Starting preview…".into()),
+                            ))
+                        }
+                    }),
             )
             .child(
                 h_flex()

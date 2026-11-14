@@ -110,6 +110,10 @@ impl WindowsCamera {
         })
     }
 
+    pub(crate) fn source(&self) -> &IMFMediaSource {
+        &self.source
+    }
+
     fn range(&self, id: ControlId) -> windows::core::Result<RawRange> {
         let mut raw = RawRange { min: 0, max: 0, step: 0, default: 0, caps: 0 };
         let RawRange { min, max, step, default, caps } = &mut raw;

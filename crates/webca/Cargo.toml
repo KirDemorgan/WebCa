@@ -13,6 +13,7 @@ webca-windows.workspace = true
 gpui-kit = "=0.9.1"
 futures = "0.3"
 serde_json = "1"
+image = { version = "0.25", default-features = false }
 
 [lints]
 workspace = true

@@ -34,16 +34,15 @@ pub struct PreviewFrame {
 /// Packs an RGB32 buffer into a [`PreviewFrame`]; a negative `stride` marks a bottom-up image.
 #[must_use]
 pub fn pack_bgra(data: &[u8], width: u32, height: u32, stride: i32) -> Option<PreviewFrame> {
-    let row_bytes = usize::try_from(width).ok()?.checked_mul(4)?;
-    let rows = usize::try_from(height).ok()?;
-    let pitch = usize::try_from(stride.unsigned_abs()).ok()?;
-    if row_bytes == 0 || rows == 0 || pitch < row_bytes {
+    let row_bytes = u128::from(width) * 4;
+    let rows = u128::from(height);
+    let pitch = u128::from(stride.unsigned_abs());
+    if row_bytes == 0 || rows == 0 || pitch < row_bytes || pitch * (rows - 1) + row_bytes > data.len() as u128
+    {
         return None;
     }
-    let needed = pitch.checked_mul(rows - 1)?.checked_add(row_bytes)?;
-    if data.len() < needed {
-        return None;
-    }
+    #[allow(clippy::cast_possible_truncation)]
+    let (row_bytes, rows, pitch) = (row_bytes as usize, rows as usize, pitch as usize);
     let mut bgra = Vec::with_capacity(row_bytes * rows);
     for row in 0..rows {
         let source_row = if stride < 0 { rows - 1 - row } else { row };

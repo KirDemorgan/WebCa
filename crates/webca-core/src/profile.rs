@@ -250,12 +250,27 @@ impl CameraProfiles {
 pub struct ProfileBook {
     version: u32,
     #[serde(default)]
+    agent: AgentSettings,
+    #[serde(default)]
     cameras: BTreeMap<CameraKey, CameraProfiles>,
+}
+
+/// Preferences of the background agent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentSettings {
+    /// Undo changes other apps make to controls while the camera streams.
+    #[serde(default)]
+    pub lock: bool,
+    /// Windows accepted the profile into its camera defaults store at the last save.
+    #[serde(default)]
+    pub native: bool,
 }
 
 #[derive(Deserialize)]
 struct RawProfileBook {
     version: u32,
+    #[serde(default)]
+    agent: AgentSettings,
     #[serde(default)]
     cameras: BTreeMap<CameraKey, CameraProfiles>,
 }
@@ -267,7 +282,7 @@ impl TryFrom<RawProfileBook> for ProfileBook {
         if raw.version > ProfileBook::VERSION {
             return Err(ProfileError::UnsupportedVersion(raw.version));
         }
-        Ok(Self { version: ProfileBook::VERSION, cameras: raw.cameras })
+        Ok(Self { version: ProfileBook::VERSION, agent: raw.agent, cameras: raw.cameras })
     }
 }
 
@@ -282,7 +297,16 @@ impl ProfileBook {
 
     #[must_use]
     pub fn new() -> Self {
-        Self { version: Self::VERSION, cameras: BTreeMap::new() }
+        Self { version: Self::VERSION, agent: AgentSettings::default(), cameras: BTreeMap::new() }
+    }
+
+    #[must_use]
+    pub const fn agent(&self) -> AgentSettings {
+        self.agent
+    }
+
+    pub const fn set_agent(&mut self, agent: AgentSettings) {
+        self.agent = agent;
     }
 
     #[must_use]
@@ -441,6 +465,23 @@ mod tests {
         assert!(text.contains("version = 1"));
         assert_eq!(ProfileBook::from_toml(&text).unwrap(), book);
         assert_eq!(ProfileBook::from_toml(&ProfileBook::default().to_toml()).unwrap(), ProfileBook::new());
+    }
+
+    #[test]
+    fn agent_settings_persist_and_default_to_off() {
+        let mut book = ProfileBook::new();
+        assert_eq!(book.agent(), AgentSettings::default());
+        book.set_agent(AgentSettings { lock: true, native: true });
+        let restored = ProfileBook::from_toml(&book.to_toml()).unwrap();
+        assert_eq!(restored.agent(), AgentSettings { lock: true, native: true });
+        let partial = ProfileBook::from_toml(
+            "version = 1
+[agent]
+lock = true
+",
+        )
+        .unwrap();
+        assert_eq!(partial.agent(), AgentSettings { lock: true, native: false });
     }
 
     #[test]

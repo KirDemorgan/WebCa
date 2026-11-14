@@ -20,7 +20,7 @@ pub use control::{ControlGroup, ControlId, UnknownControl};
 pub use device::{CameraDevice, CameraInfo, ControlCapability, DeviceError};
 pub use editor::{Editor, LiveWrite};
 pub use guard::{Action, Guard, GuardConfig, Signal};
-pub use profile::{CameraKey, CameraProfiles, Profile, ProfileBook, ProfileError};
+pub use profile::{AgentSettings, CameraKey, CameraProfiles, Profile, ProfileBook, ProfileError};
 pub use range::{ControlRange, RangeError};
 pub use setting::{ControlMode, ControlSetting};
 pub use store::{ProfileStore, StoreError};

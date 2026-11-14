@@ -44,12 +44,7 @@ impl ControlRange {
         if step <= 0 {
             return Err(RangeError::NonPositiveStep(step));
         }
-        let mut range = Self {
-            min,
-            max,
-            step,
-            default: min,
-        };
+        let mut range = Self { min, max, step, default: min };
         range.default = range.snap(default);
         Ok(range)
     }
@@ -138,26 +133,14 @@ mod tests {
 
     #[test]
     fn rejects_invalid_ranges() {
-        assert_eq!(
-            ControlRange::new(10, 0, 1, 5),
-            Err(RangeError::Inverted { min: 10, max: 0 })
-        );
-        assert_eq!(
-            ControlRange::new(0, 10, 0, 5),
-            Err(RangeError::NonPositiveStep(0))
-        );
-        assert_eq!(
-            ControlRange::new(0, 10, -2, 5),
-            Err(RangeError::NonPositiveStep(-2))
-        );
+        assert_eq!(ControlRange::new(10, 0, 1, 5), Err(RangeError::Inverted { min: 10, max: 0 }));
+        assert_eq!(ControlRange::new(0, 10, 0, 5), Err(RangeError::NonPositiveStep(0)));
+        assert_eq!(ControlRange::new(0, 10, -2, 5), Err(RangeError::NonPositiveStep(-2)));
         assert_eq!(
             RangeError::Inverted { min: 10, max: 0 }.to_string(),
             "minimum 10 is greater than maximum 0"
         );
-        assert_eq!(
-            RangeError::NonPositiveStep(0).to_string(),
-            "step must be positive, got 0"
-        );
+        assert_eq!(RangeError::NonPositiveStep(0).to_string(), "step must be positive, got 0");
     }
 
     #[test]

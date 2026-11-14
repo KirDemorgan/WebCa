@@ -33,10 +33,8 @@ impl ProfileStore {
     /// Loads the book, returning an empty one when the file does not exist yet.
     pub fn load(&self) -> Result<ProfileBook, StoreError> {
         match fs::read_to_string(&self.path) {
-            Ok(text) => ProfileBook::from_toml(&text).map_err(|source| StoreError::Parse {
-                path: self.path.clone(),
-                source,
-            }),
+            Ok(text) => ProfileBook::from_toml(&text)
+                .map_err(|source| StoreError::Parse { path: self.path.clone(), source }),
             Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(ProfileBook::new()),
             Err(source) => Err(self.io_error(source)),
         }
@@ -56,10 +54,7 @@ impl ProfileStore {
     }
 
     fn io_error(&self, source: io::Error) -> StoreError {
-        StoreError::Io {
-            path: self.path.clone(),
-            source,
-        }
+        StoreError::Io { path: self.path.clone(), source }
     }
 }
 

@@ -43,19 +43,13 @@ impl TryFrom<RawProfile> for Profile {
     type Error = ProfileError;
 
     fn try_from(raw: RawProfile) -> Result<Self, Self::Error> {
-        Ok(Self {
-            name: validate_name(&raw.name)?,
-            settings: raw.settings,
-        })
+        Ok(Self { name: validate_name(&raw.name)?, settings: raw.settings })
     }
 }
 
 impl Profile {
     pub fn new(name: &str) -> Result<Self, ProfileError> {
-        Ok(Self {
-            name: validate_name(name)?,
-            settings: BTreeMap::new(),
-        })
+        Ok(Self { name: validate_name(name)?, settings: BTreeMap::new() })
     }
 
     #[must_use]
@@ -154,25 +148,16 @@ impl TryFrom<RawCameraProfiles> for CameraProfiles {
     type Error = ProfileError;
 
     fn try_from(raw: RawCameraProfiles) -> Result<Self, Self::Error> {
-        let mut camera = Self {
-            active: String::new(),
-            profiles: Vec::with_capacity(raw.profiles.len()),
-        };
+        let mut camera = Self { active: String::new(), profiles: Vec::with_capacity(raw.profiles.len()) };
         for profile in raw.profiles {
             if camera.position(profile.name()).is_some() {
                 return Err(ProfileError::DuplicateName(profile.name));
             }
             camera.profiles.push(profile);
         }
-        let first = camera
-            .profiles
-            .first()
-            .ok_or(ProfileError::LastProfile)?
-            .name
-            .clone();
-        camera.active = camera
-            .position(&raw.active)
-            .map_or(first, |index| camera.profiles[index].name.clone());
+        let first = camera.profiles.first().ok_or(ProfileError::LastProfile)?.name.clone();
+        camera.active =
+            camera.position(&raw.active).map_or(first, |index| camera.profiles[index].name.clone());
         Ok(camera)
     }
 }
@@ -207,9 +192,7 @@ impl CameraProfiles {
     }
 
     pub fn select(&mut self, name: &str) -> Result<&Profile, ProfileError> {
-        let index = self
-            .position(name)
-            .ok_or_else(|| ProfileError::NotFound(name.to_owned()))?;
+        let index = self.position(name).ok_or_else(|| ProfileError::NotFound(name.to_owned()))?;
         self.active.clone_from(&self.profiles[index].name);
         Ok(&self.profiles[index])
     }
@@ -226,9 +209,7 @@ impl CameraProfiles {
     }
 
     pub fn rename(&mut self, from: &str, to: &str) -> Result<(), ProfileError> {
-        let index = self
-            .position(from)
-            .ok_or_else(|| ProfileError::NotFound(from.to_owned()))?;
+        let index = self.position(from).ok_or_else(|| ProfileError::NotFound(from.to_owned()))?;
         let new_name = validate_name(to)?;
         if self.position(&new_name).is_some_and(|other| other != index) {
             return Err(ProfileError::DuplicateName(new_name));
@@ -242,9 +223,7 @@ impl CameraProfiles {
     }
 
     pub fn remove(&mut self, name: &str) -> Result<Profile, ProfileError> {
-        let index = self
-            .position(name)
-            .ok_or_else(|| ProfileError::NotFound(name.to_owned()))?;
+        let index = self.position(name).ok_or_else(|| ProfileError::NotFound(name.to_owned()))?;
         if self.profiles.len() == 1 {
             return Err(ProfileError::LastProfile);
         }
@@ -257,9 +236,7 @@ impl CameraProfiles {
     }
 
     fn position(&self, name: &str) -> Option<usize> {
-        self.profiles
-            .iter()
-            .position(|profile| same_name(&profile.name, name))
+        self.profiles.iter().position(|profile| same_name(&profile.name, name))
     }
 
     fn active_index(&self) -> usize {
@@ -290,10 +267,7 @@ impl TryFrom<RawProfileBook> for ProfileBook {
         if raw.version > ProfileBook::VERSION {
             return Err(ProfileError::UnsupportedVersion(raw.version));
         }
-        Ok(Self {
-            version: ProfileBook::VERSION,
-            cameras: raw.cameras,
-        })
+        Ok(Self { version: ProfileBook::VERSION, cameras: raw.cameras })
     }
 }
 
@@ -308,10 +282,7 @@ impl ProfileBook {
 
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            version: Self::VERSION,
-            cameras: BTreeMap::new(),
-        }
+        Self { version: Self::VERSION, cameras: BTreeMap::new() }
     }
 
     #[must_use]
@@ -364,17 +335,11 @@ mod tests {
         assert!(profile.is_empty());
         profile.set(ControlId::Contrast, ControlSetting::manual(140));
         profile.set(ControlId::Brightness, ControlSetting::manual(120));
-        assert_eq!(
-            profile.get(ControlId::Contrast),
-            Some(ControlSetting::manual(140))
-        );
+        assert_eq!(profile.get(ControlId::Contrast), Some(ControlSetting::manual(140)));
         assert_eq!(profile.get(ControlId::Hue), None);
         let ids: Vec<_> = profile.settings().map(|(id, _)| id).collect();
         assert_eq!(ids, [ControlId::Brightness, ControlId::Contrast]);
-        assert_eq!(
-            profile.remove(ControlId::Contrast),
-            Some(ControlSetting::manual(140))
-        );
+        assert_eq!(profile.remove(ControlId::Contrast), Some(ControlSetting::manual(140)));
         assert_eq!(profile.remove(ControlId::Contrast), None);
     }
 
@@ -397,9 +362,7 @@ mod tests {
     #[test]
     fn added_profiles_copy_the_active_one() {
         let mut camera = CameraProfiles::default();
-        camera
-            .active_mut()
-            .set(ControlId::Gamma, ControlSetting::manual(5));
+        camera.active_mut().set(ControlId::Gamma, ControlSetting::manual(5));
         let added = camera.add("Stream").unwrap();
         assert_eq!(added.get(ControlId::Gamma), Some(ControlSetting::manual(5)));
         assert_eq!(camera.active().name(), "Default");
@@ -417,10 +380,7 @@ mod tests {
         let mut camera = camera_with(&["Day", "Night"]);
         assert_eq!(camera.select("NIGHT").unwrap().name(), "Night");
         assert_eq!(camera.active().name(), "Night");
-        assert_eq!(
-            camera.select("Party"),
-            Err(ProfileError::NotFound("Party".into()))
-        );
+        assert_eq!(camera.select("Party"), Err(ProfileError::NotFound("Party".into())));
         assert_eq!(camera.get("day").map(Profile::name), Some("Day"));
         assert!(camera.get("Party").is_none());
     }
@@ -434,14 +394,8 @@ mod tests {
         camera.rename("Default", "Base").unwrap();
         assert_eq!(camera.active().name(), "Morning");
         camera.rename("morning", "Morning").unwrap();
-        assert_eq!(
-            camera.rename("Base", "MORNING"),
-            Err(ProfileError::DuplicateName("MORNING".into()))
-        );
-        assert_eq!(
-            camera.rename("Ghost", "X"),
-            Err(ProfileError::NotFound("Ghost".into()))
-        );
+        assert_eq!(camera.rename("Base", "MORNING"), Err(ProfileError::DuplicateName("MORNING".into())));
+        assert_eq!(camera.rename("Ghost", "X"), Err(ProfileError::NotFound("Ghost".into())));
         assert_eq!(camera.rename("Base", " "), Err(ProfileError::EmptyName));
     }
 
@@ -462,13 +416,8 @@ mod tests {
         let key = CameraKey::new("cam");
         let mut book = ProfileBook::new();
         assert!(book.camera(&key).is_none());
-        book.camera_mut(&key)
-            .active_mut()
-            .set(ControlId::Zoom, ControlSetting::manual(2));
-        assert_eq!(
-            book.camera(&key).unwrap().active().get(ControlId::Zoom),
-            Some(ControlSetting::manual(2))
-        );
+        book.camera_mut(&key).active_mut().set(ControlId::Zoom, ControlSetting::manual(2));
+        assert_eq!(book.camera(&key).unwrap().active().get(ControlId::Zoom), Some(ControlSetting::manual(2)));
         assert_eq!(book.cameras().count(), 1);
     }
 
@@ -477,27 +426,19 @@ mod tests {
         let key = CameraKey::new(r"\\?\usb#vid_1d6c&pid_0103");
         let mut book = ProfileBook::new();
         let camera = book.camera_mut(&key);
-        camera
-            .active_mut()
-            .set(ControlId::WhiteBalance, ControlSetting::auto(4600));
+        camera.active_mut().set(ControlId::WhiteBalance, ControlSetting::auto(4600));
         camera.add("Night").unwrap();
         camera.select("Night").unwrap();
         let text = book.to_toml();
         assert!(text.contains("version = 1"));
         assert_eq!(ProfileBook::from_toml(&text).unwrap(), book);
-        assert_eq!(
-            ProfileBook::from_toml(&ProfileBook::default().to_toml()).unwrap(),
-            ProfileBook::new()
-        );
+        assert_eq!(ProfileBook::from_toml(&ProfileBook::default().to_toml()).unwrap(), ProfileBook::new());
     }
 
     #[test]
     fn book_rejects_newer_versions() {
         let err = ProfileBook::from_toml("version = 99").unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("profile file version 99 is not supported")
-        );
+        assert!(err.to_string().contains("profile file version 99 is not supported"));
     }
 
     #[test]
@@ -511,20 +452,10 @@ mod tests {
             [[cameras.cam.profiles]]
             name = "a"
         "#;
-        assert!(
-            ProfileBook::from_toml(duplicate)
-                .unwrap_err()
-                .to_string()
-                .contains("already exists")
-        );
+        assert!(ProfileBook::from_toml(duplicate).unwrap_err().to_string().contains("already exists"));
 
         let empty = "version = 1\n[cameras.cam]\nactive = \"A\"\nprofiles = []\n";
-        assert!(
-            ProfileBook::from_toml(empty)
-                .unwrap_err()
-                .to_string()
-                .contains("last profile")
-        );
+        assert!(ProfileBook::from_toml(empty).unwrap_err().to_string().contains("last profile"));
 
         let unknown_active = r#"
             version = 1
@@ -534,29 +465,15 @@ mod tests {
             name = "Kept"
         "#;
         let book = ProfileBook::from_toml(unknown_active).unwrap();
-        assert_eq!(
-            book.camera(&CameraKey::new("cam")).unwrap().active().name(),
-            "Kept"
-        );
+        assert_eq!(book.camera(&CameraKey::new("cam")).unwrap().active().name(), "Kept");
 
         let bad_name = "version = 1\n[cameras.cam]\nactive = \"\"\n[[cameras.cam.profiles]]\nname = \"\"\n";
-        assert!(
-            ProfileBook::from_toml(bad_name)
-                .unwrap_err()
-                .to_string()
-                .contains("cannot be empty")
-        );
+        assert!(ProfileBook::from_toml(bad_name).unwrap_err().to_string().contains("cannot be empty"));
     }
 
     #[test]
     fn errors_have_readable_messages() {
-        assert_eq!(
-            ProfileError::NameTooLong.to_string(),
-            "profile name cannot be longer than 32 characters"
-        );
-        assert_eq!(
-            ProfileError::NotFound("X".into()).to_string(),
-            "no profile named `X`"
-        );
+        assert_eq!(ProfileError::NameTooLong.to_string(), "profile name cannot be longer than 32 characters");
+        assert_eq!(ProfileError::NotFound("X".into()).to_string(), "no profile named `X`");
     }
 }

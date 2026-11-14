@@ -22,18 +22,12 @@ pub struct ControlSetting {
 impl ControlSetting {
     #[must_use]
     pub const fn manual(value: i32) -> Self {
-        Self {
-            value,
-            mode: ControlMode::Manual,
-        }
+        Self { value, mode: ControlMode::Manual }
     }
 
     #[must_use]
     pub const fn auto(value: i32) -> Self {
-        Self {
-            value,
-            mode: ControlMode::Auto,
-        }
+        Self { value, mode: ControlMode::Auto }
     }
 
     #[must_use]
@@ -44,10 +38,7 @@ impl ControlSetting {
     /// The same setting with its value made legal for `range`.
     #[must_use]
     pub fn fitted_to(self, range: &ControlRange) -> Self {
-        Self {
-            value: range.snap(self.value),
-            ..self
-        }
+        Self { value: range.snap(self.value), ..self }
     }
 }
 
@@ -65,14 +56,8 @@ mod tests {
     #[test]
     fn fitting_snaps_value_and_keeps_mode() {
         let range = ControlRange::new(0, 100, 10, 50).unwrap();
-        assert_eq!(
-            ControlSetting::auto(87).fitted_to(&range),
-            ControlSetting::auto(90)
-        );
-        assert_eq!(
-            ControlSetting::manual(-4).fitted_to(&range),
-            ControlSetting::manual(0)
-        );
+        assert_eq!(ControlSetting::auto(87).fitted_to(&range), ControlSetting::auto(90));
+        assert_eq!(ControlSetting::manual(-4).fitted_to(&range), ControlSetting::manual(0));
     }
 
     #[test]

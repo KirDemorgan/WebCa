@@ -113,10 +113,7 @@ impl FromStr for ControlId {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let normalized = s.trim().to_ascii_lowercase().replace(['-', ' '], "_");
-        Self::ALL
-            .into_iter()
-            .find(|id| id.key() == normalized)
-            .ok_or_else(|| UnknownControl(s.to_owned()))
+        Self::ALL.into_iter().find(|id| id.key() == normalized).ok_or_else(|| UnknownControl(s.to_owned()))
     }
 }
 
@@ -139,10 +136,7 @@ mod tests {
     #[test]
     fn parsing_accepts_human_spellings() {
         assert_eq!("White Balance".parse::<ControlId>(), Ok(ControlId::WhiteBalance));
-        assert_eq!(
-            " power-line-frequency ".parse::<ControlId>(),
-            Ok(ControlId::PowerLineFrequency)
-        );
+        assert_eq!(" power-line-frequency ".parse::<ControlId>(), Ok(ControlId::PowerLineFrequency));
         assert_eq!("BRIGHTNESS".parse::<ControlId>(), Ok(ControlId::Brightness));
     }
 
@@ -176,14 +170,8 @@ mod tests {
         struct Wrapper {
             id: ControlId,
         }
-        let encoded = toml::to_string(&Wrapper {
-            id: ControlId::BacklightCompensation,
-        })
-        .unwrap();
+        let encoded = toml::to_string(&Wrapper { id: ControlId::BacklightCompensation }).unwrap();
         assert_eq!(encoded.trim(), r#"id = "backlight_compensation""#);
-        assert_eq!(
-            toml::from_str::<Wrapper>(&encoded).unwrap().id,
-            ControlId::BacklightCompensation
-        );
+        assert_eq!(toml::from_str::<Wrapper>(&encoded).unwrap().id, ControlId::BacklightCompensation);
     }
 }

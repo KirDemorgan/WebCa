@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod agent;
+mod command;
 mod labels;
 mod shell;
 mod studio;
@@ -49,6 +50,24 @@ fn run_elevated_request(arguments: &[String]) -> Option<i32> {
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();
     if let Some(code) = run_elevated_request(&arguments) {
+        std::process::exit(code);
+    }
+    if let Some(request) = webca_core::cli::parse(arguments.get(1..).unwrap_or_default())
+        .filter(|_| arguments.get(1).is_none_or(|first| first != AGENT_FLAG))
+    {
+        let code = match request {
+            Ok(request) => command::run(&request, &ProfileStore::new(profile_path())),
+            Err(error) => {
+                webca_windows::attach_parent_console();
+                eprintln!(
+                    "webca: {error}
+
+{}",
+                    webca_core::cli::USAGE
+                );
+                2
+            }
+        };
         std::process::exit(code);
     }
     let start_hidden = arguments.iter().any(|argument| argument == AGENT_FLAG);

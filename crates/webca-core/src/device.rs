@@ -47,7 +47,7 @@ pub enum DeviceError {
 }
 
 /// Access to the controls of one opened camera.
-pub trait CameraDevice {
+pub trait CameraDevice: std::fmt::Debug {
     fn info(&self) -> &CameraInfo;
 
     fn capabilities(&self) -> Result<Vec<ControlCapability>, DeviceError>;

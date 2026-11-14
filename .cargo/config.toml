@@ -1,6 +1,6 @@
 [alias]
 cov = [
   "llvm-cov", "-p", "webca-core", "-p", "webca-windows",
-  "--ignore-filename-regex", 'webca-windows[/\\]src[/\\](autostart|camera|companion|defaults|error|instance|monitor|preview|session)\.rs',
+  "--ignore-filename-regex", 'webca-windows[/\\]src[/\\](autostart|camera|companion|console|defaults|error|instance|monitor|preview|session)\.rs',
   "--fail-under-regions", "100", "--fail-under-lines", "100", "--summary-only",
 ]

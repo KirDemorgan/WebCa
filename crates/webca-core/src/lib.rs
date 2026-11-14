@@ -3,10 +3,12 @@
 //! This crate has no platform dependencies: every type here can be exercised in tests on any OS.
 
 mod apply;
+pub mod cli;
 mod control;
 mod device;
 mod editor;
 mod guard;
+pub mod mcp;
 mod profile;
 mod range;
 mod setting;

@@ -10,6 +10,8 @@ mod camera;
 #[cfg(windows)]
 mod companion;
 #[cfg(windows)]
+mod console;
+#[cfg(windows)]
 mod defaults;
 #[cfg(windows)]
 mod error;
@@ -28,6 +30,8 @@ pub use autostart::{autostart_command, autostart_entry, disable_autostart, enabl
 pub use camera::{CameraEntry, WindowsCamera, list_cameras};
 #[cfg(windows)]
 pub use companion::{associate, current_package_family, dissociate, run_elevated};
+#[cfg(windows)]
+pub use console::attach_parent_console;
 #[cfg(windows)]
 pub use defaults::{DefaultsError, DefaultsStore, companion_app};
 pub use frame::{PreviewFrame, VideoFormat, pack_bgra, pick_preview_format};

@@ -14,11 +14,14 @@ use gpui_kit::{
     RenderImage, SharedString, Styled, StyledImage, Subscription, Window, div, img, prelude::*, px,
 };
 use webca_core::{
-    CameraProfiles, ControlGroup, ControlId, ControlState, Editor, LiveWrite, ProfileBook, ProfileStore,
+    AgentSettings, CameraProfiles, ControlGroup, ControlId, ControlState, Editor, LiveWrite, ProfileBook,
+    ProfileStore,
 };
 
 use crate::{
+    agent::{Agent, AgentCommand},
     labels,
+    shell::{Shell, ShellEvent},
     worker::{CameraWorker, Command, Event, FrameSlot},
 };
 
@@ -35,6 +38,7 @@ pub struct Studio {
     screen: Screen,
     worker: CameraWorker,
     store: ProfileStore,
+    agent: Agent,
     book: ProfileBook,
     sliders: BTreeMap<ControlId, Entity<SliderState>>,
     status: Option<SharedString>,
@@ -43,10 +47,13 @@ pub struct Studio {
     preview_note: Option<SharedString>,
     slider_subscriptions: Vec<Subscription>,
     _appearance: Subscription,
+    _release: Subscription,
 }
 
 impl Studio {
-    pub fn new(store: ProfileStore, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(store: ProfileStore, agent: Agent, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        agent.send(AgentCommand::Pause);
+        let release = cx.on_release(|studio: &mut Self, _| studio.agent.send(AgentCommand::Resume));
         let (worker, events, frames) = CameraWorker::spawn();
         let (book, status) = match store.load() {
             Ok(book) => (book, None),
@@ -60,6 +67,7 @@ impl Studio {
             screen: Screen::Connecting,
             worker,
             store,
+            agent,
             book,
             sliders: BTreeMap::new(),
             status,
@@ -68,6 +76,7 @@ impl Studio {
             preview_note: None,
             slider_subscriptions: Vec::new(),
             _appearance: appearance,
+            _release: release,
         }
     }
 
@@ -93,10 +102,8 @@ impl Studio {
             Event::Failed(message) => {
                 self.screen = Screen::Message(format!("Cannot open the camera: {message}").into());
             }
-            Event::DefaultsSaved => self.status = Some("Saved. Windows applies it in every app.".into()),
-            Event::DefaultsUnavailable => {
-                self.status = Some("Saved. Turn on system-wide mode to apply it in every app.".into());
-            }
+            Event::DefaultsSaved => self.finish_save(true, cx),
+            Event::DefaultsUnavailable => self.finish_save(false, cx),
             Event::DefaultsFailed(message) => {
                 self.status = Some(format!("Saved, but Windows refused: {message}").into());
             }
@@ -202,6 +209,21 @@ impl Studio {
             Err(error) => self.status = Some(error.to_string().into()),
         }
         cx.notify();
+    }
+
+    fn finish_save(&mut self, native: bool, cx: &mut Context<Self>) {
+        let settings = self.book.agent();
+        self.book.set_agent(AgentSettings { native, ..settings });
+        let _ = self.store.save(&self.book);
+        if let Ok(executable) = std::env::current_exe() {
+            let _ = webca_windows::enable_autostart(&executable);
+        }
+        Shell::notify(cx, ShellEvent::ProfilesChanged);
+        self.status = Some(if native {
+            "Saved. Windows applies it in every app.".into()
+        } else {
+            "Saved. WebCa keeps it applied from the tray.".into()
+        });
     }
 
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {

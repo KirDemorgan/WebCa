@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Build MSIX package
+        shell: pwsh
+        run: ./scripts/package.ps1 -Mode Pack -Publisher '${{ vars.MSIX_PUBLISHER || 'CN=WebCa' }}'
+      - name: Build portable archive
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'
+          Compress-Archive -Path target/x86_64-pc-windows-msvc/release/webca.exe, LICENSE, README.md `
+            -DestinationPath "target/package/WebCa-$version-portable-x64.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            target/package/*.msix
+            target/package/*.zip

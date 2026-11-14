@@ -279,6 +279,7 @@ dependencies = [
 name = "webca-windows"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
  "webca-core",
  "windows",
 ]

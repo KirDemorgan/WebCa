@@ -28,7 +28,7 @@ use crate::{
 pub struct CameraEntry {
     pub info: CameraInfo,
     pub device_path: String,
-    activate: IMFActivate,
+    pub(crate) activate: IMFActivate,
 }
 
 /// Lists video capture devices in the order Windows reports them.

@@ -43,6 +43,44 @@ pub const fn locate(id: ControlId) -> Location {
     }
 }
 
+#[must_use]
+pub fn identify(location: Location) -> Option<ControlId> {
+    ControlId::ALL.into_iter().find(|id| locate(*id) == location)
+}
+
+/// When Windows writes a stored default: before the stream starts, or once frames flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Timing {
+    BeforeStart,
+    AfterStart,
+}
+
+/// Controls driven by the camera's auto algorithms need frames to converge, so their defaults
+/// are written after the stream starts.
+#[must_use]
+pub const fn timing(id: ControlId) -> Timing {
+    match id {
+        ControlId::Exposure | ControlId::Focus | ControlId::WhiteBalance => Timing::AfterStart,
+        _ => Timing::BeforeStart,
+    }
+}
+
+/// Registry path, under `HKEY_LOCAL_MACHINE`, of the device parameters that link a camera to its
+/// companion app.
+#[must_use]
+pub fn device_parameters_key(device_path: &str) -> Option<String> {
+    let rest = device_path.strip_prefix(r"\\?\")?;
+    let (interface, reference) = rest.rsplit_once('\\').unwrap_or((rest, ""));
+    let class_start = interface.rfind("#{")? + 1;
+    let class = &interface[class_start..];
+    if !class.ends_with('}') {
+        return None;
+    }
+    Some(format!(
+        r"SYSTEM\CurrentControlSet\Control\DeviceClasses\{class}\##?#{interface}\#{reference}\Device Parameters"
+    ))
+}
+
 /// Raw output of `GetRange` on a DirectShow control interface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RawRange {
@@ -117,6 +155,41 @@ mod tests {
         }
         assert_eq!(locate(ControlId::Exposure), Location::CameraControl(4));
         assert_eq!(locate(ControlId::PowerLineFrequency), Location::ProcAmp(13));
+    }
+
+    #[test]
+    fn identify_inverts_locate() {
+        for id in ControlId::ALL {
+            assert_eq!(identify(locate(id)), Some(id));
+        }
+        assert_eq!(identify(Location::ProcAmp(6)), None);
+        assert_eq!(identify(Location::CameraControl(5)), None);
+    }
+
+    #[test]
+    fn auto_driven_controls_apply_after_start() {
+        let late: Vec<_> =
+            ControlId::ALL.into_iter().filter(|id| timing(*id) == Timing::AfterStart).collect();
+        assert_eq!(late, [ControlId::WhiteBalance, ControlId::Exposure, ControlId::Focus]);
+        assert_eq!(timing(ControlId::Saturation), Timing::BeforeStart);
+    }
+
+    #[test]
+    fn device_parameters_key_matches_registry_layout() {
+        let path = r"\\?\usb#vid_1d6c&pid_0103&mi_00#7&285f974e&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}\global";
+        assert_eq!(
+            device_parameters_key(path).unwrap(),
+            r"SYSTEM\CurrentControlSet\Control\DeviceClasses\{e5323777-f976-4f5b-9b55-b94699c46e44}\##?#usb#vid_1d6c&pid_0103&mi_00#7&285f974e&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}\#global\Device Parameters"
+        );
+        let without_reference = r"\\?\root#camera#0000#{e5323777-f976-4f5b-9b55-b94699c46e44}";
+        assert!(device_parameters_key(without_reference).unwrap().ends_with(r"\#\Device Parameters"));
+    }
+
+    #[test]
+    fn device_parameters_key_rejects_foreign_paths() {
+        assert_eq!(device_parameters_key("usb#vid#{guid}"), None);
+        assert_eq!(device_parameters_key(r"\\?\usb#vid_1d6c\global"), None);
+        assert_eq!(device_parameters_key(r"\\?\usb#vid#{guid\global"), None);
     }
 
     #[test]

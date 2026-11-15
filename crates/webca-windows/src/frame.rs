@@ -49,7 +49,7 @@ pub fn pack_bgra(data: &[u8], width: u32, height: u32, stride: i32) -> Option<Pr
         let start = source_row * pitch;
         bgra.extend_from_slice(&data[start..start + row_bytes]);
     }
-    for pixel in bgra.chunks_exact_mut(4) {
+    for pixel in bgra.as_chunks_mut::<4>().0 {
         pixel[3] = u8::MAX;
     }
     Some(PreviewFrame { width, height, bgra })

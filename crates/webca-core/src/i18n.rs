@@ -241,10 +241,10 @@ mod tests {
     fn every_control_and_group_has_labels() {
         for locale in LOCALES {
             for id in ControlId::ALL {
-                assert!(!control_label(locale, id).is_empty());
+                assert_ne!(control_label(locale, id), "");
             }
             for group in [ControlGroup::Image, ControlGroup::Light, ControlGroup::Optics] {
-                assert!(!group_label(locale, group).is_empty());
+                assert_ne!(group_label(locale, group), "");
             }
         }
         assert_eq!(control_label(Locale::Russian, ControlId::WhiteBalance), "Баланс белого");
